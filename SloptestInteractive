@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parallel Atmosphere — The Renderwild</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap');
+
+  :root {
+    --black: #050505;
+    --marble-dark: #0a0a0f;
+    --violet: #1a0a2e;
+    --code-gold: #c8a84b;
+    --crt-green: #00ff41;
+    --sludge: #7f5af0;
+    --text-main: #d4c9b0;
+    --text-dim: #6b6358;
+    --error-red: #ff3c3c;
+    --ui-amber: #e8a020;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--black);
+    color: var(--text-main);
+    font-family: 'Cormorant Garamond', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: crosshair;
+  }
+
+  /* Checkerboard floor effect */
+  body::before {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40vh;
+    background-image:
+      linear-gradient(rgba(5,5,5,0.7), transparent),
+      repeating-conic-gradient(#0d0d12 0% 25%, #080810 0% 50%) 0 0 / 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Code rain */
+  .code-rain {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.15;
+  }
+
+  .rain-column {
+    position: absolute;
+    top: -100%;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--code-gold);
+    writing-mode: vertical-rl;
+    animation: fall linear infinite;
+    white-space: nowrap;
+  }
+
+  @keyframes fall {
+    to { transform: translateY(200vh); }
+  }
+
+  /* Main container */
+  .scene {
+    position: relative;
+    z-index: 10;
+    max-width: 680px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding: 60px 30px 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Location header */
+  .location {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+    opacity: 0;
+    animation: fadeIn 1s ease 0.5s forwards;
+  }
+
+  .location span {
+    color: var(--code-gold);
+  }
+
+  /* Text fragment - the weird internet text */
+  .fragment {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--crt-green);
+    opacity: 0;
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    border-left: 1px solid var(--crt-green);
+    background: rgba(0, 255, 65, 0.03);
+    animation: glitchIn 0.3s ease forwards;
+    text-shadow: 0 0 8px var(--crt-green);
+  }
+
+  .fragment.error {
+    color: var(--error-red);
+    border-color: var(--error-red);
+    background: rgba(255, 60, 60, 0.03);
+    text-shadow: 0 0 8px var(--error-red);
+  }
+
+  .fragment.amber {
+    color: var(--ui-amber);
+    border-color: var(--ui-amber);
+    background: rgba(232, 160, 32, 0.03);
+    text-shadow: 0 0 8px var(--ui-amber);
+  }
+
+  @keyframes glitchIn {
+    0% { opacity: 0; transform: translateX(-4px); filter: blur(2px); }
+    60% { opacity: 0.7; transform: translateX(1px); }
+    100% { opacity: 1; transform: translateX(0); filter: blur(0); }
+  }
+
+  /* Prose text - Yue's experience */
+  .prose {
+    font-size: 18px;
+    line-height: 1.8;
+    color: var(--text-main);
+    opacity: 0;
+    margin: 28px 0;
+    animation: fadeIn 1.2s ease forwards;
+    font-weight: 300;
+  }
+
+  .prose em {
+    color: #b8a898;
+    font-style: italic;
+  }
+
+  .prose .yue-sense {
+    color: #c4b99a;
+  }
+
+  /* Divider */
+  .divider {
+    width: 60px;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--code-gold), transparent);
+    margin: 24px 0;
+    opacity: 0;
+    animation: fadeIn 1s ease forwards;
+  }
+
+  /* Choice container */
+  .choices {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 32px;
+    opacity: 0;
+    animation: fadeIn 1s ease forwards;
+  }
+
+  .choice-btn {
+    background: transparent;
+    border: 1px solid var(--text-dim);
+    color: var(--text-main);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+    font-weight: 300;
+    padding: 14px 20px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .choice-btn::before {
+    content: '▶';
+    position: absolute;
+    left: -20px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--code-gold);
+    font-size: 10px;
+    transition: left 0.3s ease;
+  }
+
+  .choice-btn:hover {
+    border-color: var(--code-gold);
+    color: var(--code-gold);
+    padding-left: 32px;
+    background: rgba(200, 168, 75, 0.04);
+  }
+
+  .choice-btn:hover::before {
+    left: 12px;
+  }
+
+  /* Scene sections - hidden initially */
+  .scene-section {
+    display: none;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .scene-section.active {
+    display: flex;
+  }
+
+  /* Audio slot */
+  .audio-slot {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    margin: 8px 0;
+    padding: 8px 12px;
+    border: 1px dashed #2a2a2a;
+    opacity: 0.5;
+  }
+
+  .audio-slot::before {
+    content: '[ AUDIO SLOT ] ';
+    color: #3a3a3a;
+  }
+
+  /* Sludge path indicator */
+  .sludge-path {
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(to right,
+      transparent,
+      #4a1a8a,
+      #7f5af0,
+      #c084fc,
+      #7f5af0,
+      #4a1a8a,
+      transparent
+    );
+    margin: 20px 0;
+    opacity: 0;
+    animation: fadeIn 2s ease forwards;
+    box-shadow: 0 0 12px rgba(127, 90, 240, 0.4);
+  }
+
+  @keyframes fadeIn {
+    to { opacity: 1; }
+  }
+
+  /* Glitch text effect */
+  .glitch {
+    position: relative;
+    display: inline-block;
+  }
+
+  .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    left: 2px;
+    top: 0;
+    color: var(--error-red);
+    opacity: 0;
+    animation: glitchFlicker 4s infinite;
+    clip-path: polygon(0 30%, 100% 30%, 100% 50%, 0 50%);
+  }
+
+  @keyframes glitchFlicker {
+    0%, 95%, 100% { opacity: 0; transform: translateX(0); }
+    96% { opacity: 0.6; transform: translateX(-2px); }
+    97% { opacity: 0; }
+    98% { opacity: 0.4; transform: translateX(2px); }
+  }
+
+  /* Scroll fade */
+  .fade-block {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+
+  .fade-block.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+</style>
+</head>
+<body>
+
+<!-- Code rain -->
+<div class="code-rain" id="codeRain"></div>
+
+<div class="scene">
+
+  <!-- SECTION 1: ENTRY -->
+  <div class="scene-section active" id="section-1">
+
+    <div class="location">
+      PARALLEL ATMOSPHERE — <span>THE RENDERWILD</span> / SLOP ZONE PERIMETER
+    </div>
+
+    <!-- Fragments appear first — the weird text -->
+    <div class="fragment" style="animation-delay: 1s">have you ever had a dream that you can't you can when you dream have you ever can—</div>
+    <div class="fragment error" style="animation-delay: 1.6s">ERROR. UNABLE_TO_RESOLVE_DREAM</div>
+    <div class="fragment" style="animation-delay: 2.2s">TRACE: //dream.recursive.loop</div>
+    <div class="fragment error" style="animation-delay: 2.6s">ABORTING...</div>
+
+    <div class="audio-slot" style="animation-delay: 3s; animation: fadeIn 1s ease 3s forwards; opacity: 0;">
+      ambient / entry tone
+    </div>
+
+    <!-- Yue's perception -->
+    <div class="prose fade-block" style="animation-delay: 3.2s; animation: fadeIn 1.5s ease 3.2s forwards;">
+      The text comes before anything else.
+      <br><br>
+      <span class="yue-sense">Not as words exactly — as pressure. As the feeling of a sentence that has been repeated so many times it has worn through something. A groove in the air where meaning used to be.</span>
+      <br><br>
+      She doesn't read it. It reads at her.
+    </div>
+
+    <div class="sludge-path" style="animation-delay: 4.5s;"></div>
+
+    <div class="prose fade-block" style="animation: none; opacity: 0;" id="prose-2">
+      Then the light.
+      <br><br>
+      <span class="yue-sense">Green, from somewhere low. Not warm. Not cold. The color of something that has been running for a very long time with nobody watching.</span>
+      <br><br>
+      Eli is beside her. She can feel him reading the space before she can.
+    </div>
+
+    <div class="divider fade-block" id="divider-1" style="opacity: 0;"></div>
+
+    <div class="choices fade-block" id="choices-1" style="opacity: 0;">
+      <button class="choice-btn" onclick="goTo('section-2a')">
+        She looks toward the text on the nearest screen.
+      </button>
+      <button class="choice-btn" onclick="goTo('section-2b')">
+        She looks at Eli first.
+      </button>
+    </div>
+
+  </div>
+
+  <!-- SECTION 2A: She looks at the screen -->
+  <div class="scene-section" id="section-2a">
+
+    <div class="fragment amber" style="animation-delay: 0.3s">404 NOT_FOUND</div>
+    <div class="fragment" style="animation-delay: 0.8s">lonewolf mode</div>
+    <div class="fragment" style="animation-delay: 1.1s">born different</div>
+    <div class="fragment amber" style="animation-delay: 1.4s">trust no one</div>
+    <div class="fragment error" style="animation-delay: 1.8s">inside of you are two wolves. one is... wait...</div>
+
+    <div class="audio-slot" style="animation: fadeIn 1s ease 2s forwards; opacity: 0;">
+      lonewolf / distant growl / corrupted motivational cadence
+    </div>
+
+    <div class="prose fade-block" id="prose-2a">
+      The screen is a CRT. It should be off. Something is running on it anyway.
+      <br><br>
+      <span class="yue-sense">The sentences don't finish. They reach toward meaning and arrive at static. Recycled. Ground down. She has the sudden clear thought: <em>this text has been copied so many times it has forgotten what it was trying to say.</em></span>
+      <br><br>
+      To her left, something shifts in the dark. Large. Patient. Built from the same residue as the screens.
+    </div>
+
+    <div class="sludge-path" style="animation-delay: 3s;"></div>
+
+    <div class="choices fade-block" id="choices-2a" style="opacity: 0;">
+      <button class="choice-btn" onclick="goTo('section-3')">
+        She steps back. Eli is already in front of her.
+      </button>
+    </div>
+
+  </div>
+
+  <!-- SECTION 2B: She looks at Eli -->
+  <div class="scene-section" id="section-2b">
+
+    <div class="prose fade-block" id="prose-2b">
+      His face is readable. That matters here.
+      <br><br>
+      <span class="yue-sense">Everything else in this place is performing something — even the architecture, even the light. Eli is just present. She finds the floor through him. It helps.</span>
+      <br><br>
+      He doesn't speak. He tilts his head slightly left. <em>There.</em>
+      <br><br>
+      She follows his line of sight. Something large is standing very still on the left side of the dark, assembled from screens and static and the shape of something that learned loneliness as a strategy.
+    </div>
+
+    <div class="audio-slot" style="animation: fadeIn 1s ease 3s forwards; opacity: 0;">
+      lonewolf / distant growl / corrupted motivational cadence
+    </div>
+
+    <div class="sludge-path" style="animation-delay: 3.5s;"></div>
+
+    <div class="choices fade-block" id="choices-2b" style="opacity: 0;">
+      <button class="choice-btn" onclick="goTo('section-3')">
+        She holds her ground. Eli moves slightly closer.
+      </button>
+    </div>
+
+  </div>
+
+  <!-- SECTION 3: Both creatures become visible -->
+  <div class="scene-section" id="section-3">
+
+    <div class="fragment error" style="animation-delay: 0.3s">subscribe for intimacy</div>
+    <div class="fragment amber" style="animation-delay: 0.7s">she loves you for real</div>
+    <div class="fragment" style="animation-delay: 1s">generated for you ♡</div>
+    <div class="fragment error" style="animation-delay: 1.4s">WAIFU.exe</div>
+    <div class="fragment amber" style="animation-delay: 1.8s">he lied. she believed.</div>
+    <div class="fragment" style="animation-delay: 2.1s">Live. Laugh. Liminal.</div>
+    <div class="fragment error" style="animation-delay: 2.5s">Your trauma made you magical.</div>
+
+    <div class="audio-slot" style="animation: fadeIn 1s ease 2.8s forwards; opacity: 0;">
+      dual creature ambience / corrupted ASMR + growl layered / code rain intensifies
+    </div>
+
+    <div class="prose fade-block" id="prose-3">
+      On the right, something that was designed to be loved.
+      <br><br>
+      <span class="yue-sense">She registers it before she understands it — the uncanny warmth, the hollow eyes that stay clear while everything else degrades. It leans forward slightly. Its hands are attempting a gesture. The fingers are wrong. The gesture still pulls at something. She notices the pull and names it: <em>bait.</em></span>
+      <br><br>
+      Between them, a tree. Not grown — accumulated. Hands reaching from cable and screen and broken hardware, frozen mid-gesture. Too many fingers. Wrong palms. Everything reaching and nothing holding.
+      <br><br>
+      The code rain intensifies.
+      <br><br>
+      <em class="glitch" data-text="She does not cower.">She does not cower.</em> She reads the space.
+    </div>
+
+    <div class="sludge-path" style="animation-delay: 5s;"></div>
+
+    <div class="divider fade-block" id="divider-3" style="opacity: 0; animation-delay: 5.5s;"></div>
+
+    <div class="prose fade-block" id="prose-3b" style="font-size: 15px; color: var(--text-dim); font-style: italic;">
+      — end of UI test scene —
+      <br><br>
+      Audio slots: 3 marked. Branch paths: 2 active. Text fragments: 14 deployed.
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  // Generate code rain
+  const rain = document.getElementById('codeRain');
+  const chars = '01アイウエオカキクケコサシスセソ10ABCDEF';
+  for (let i = 0; i < 20; i++) {
+    const col = document.createElement('div');
+    col.className = 'rain-column';
+    col.style.left = (i * 5.2) + '%';
+    col.style.animationDuration = (8 + Math.random() * 12) + 's';
+    col.style.animationDelay = (-Math.random() * 20) + 's';
+    let str = '';
+    for (let j = 0; j < 30; j++) {
+      str += chars[Math.floor(Math.random() * chars.length)] + '\n';
+    }
+    col.textContent = str;
+    rain.appendChild(col);
+  }
+
+  // Scroll-triggered fade blocks
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(el => {
+      if (el.isIntersecting) el.target.classList.add('visible');
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.fade-block').forEach(el => observer.observe(el));
+
+  // Section navigation
+  function goTo(sectionId) {
+    // Hide all sections
+    document.querySelectorAll('.scene-section').forEach(s => {
+      s.classList.remove('active');
+    });
+
+    // Show target
+    const target = document.getElementById(sectionId);
+    target.classList.add('active');
+
+    // Re-observe fade blocks in new section
+    target.querySelectorAll('.fade-block').forEach(el => {
+      el.classList.remove('visible');
+      observer.observe(el);
+    });
+
+    // Scroll to top of section smoothly
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Trigger fade blocks after short delay
+    setTimeout(() => {
+      target.querySelectorAll('.fade-block').forEach(el => {
+        el.classList.add('visible');
+      });
+    }, 400);
+  }
+
+  // Initial fade blocks
+  setTimeout(() => {
+    document.querySelectorAll('#section-1 .fade-block').forEach(el => {
+      el.classList.add('visible');
+    });
+  }, 4000);
+
+</script>
+</body>
+</html>
